@@ -1,0 +1,596 @@
+Rate My Professors Kyrgyzstan - Product and Technical Requirements
+=================================================================
+
+Document status: initial contributor proposal
+Target project: local Kyrgyzstan-focused analogue of RateMyProfessors
+Primary stack: Django monolith, Django Templates, HTMX, PostgreSQL
+
+
+1. Project Goal
+---------------
+
+The goal of this project is to build a simple, trustworthy, and locally relevant
+platform where students in Kyrgyzstan can find universities, professors, and
+courses, then read and publish structured reviews about learning experience.
+
+The product should help students answer practical questions:
+
+- Who teaches this course?
+- What is this professor like in class?
+- How difficult is the course with this professor?
+- Is attendance strict?
+- Are grades transparent?
+- Would other students take this professor again?
+- Which university or department does this professor belong to?
+
+The project is inspired by ratemyprofessors.com, but it should not blindly copy
+all of its features. The local version should be smaller, clearer, and adapted
+to Kyrgyzstan universities, languages, moderation needs, and expected traffic.
+
+The first production version must prioritize correctness, moderation, and ease
+of maintenance over feature quantity.
+
+
+2. Product Principles
+---------------------
+
+2.1 Trust before growth
+
+The platform is only useful if users believe the reviews are real and reasonably
+moderated. Anti-spam, reporting, admin moderation, and clear review rules are
+core requirements, not future luxuries.
+
+2.2 Small audience, production discipline
+
+The expected audience is not massive. The architecture should therefore stay
+simple. However, the project should still follow production habits used in larger
+systems: clear boundaries, environment-based configuration, database migrations,
+tests for core flows, backups, security defaults, and a deployment process that
+can be repeated.
+
+2.3 Server-rendered first
+
+The project does not need a separate SPA frontend. Most pages are content,
+search, forms, and lists. Django Templates with selective HTMX interactions are
+enough for a polished product and much easier to maintain.
+
+2.4 Admin workflows matter
+
+The public website is only half of the system. Admin and moderator workflows
+must be practical because review quality depends on them.
+
+2.5 Local relevance
+
+The domain model should support Kyrgyzstan universities, cities, departments,
+courses, and multilingual content where needed. The project should be able to
+start with English/Russian UI and later support Kyrgyz/Kyrgyzstan-specific
+localization without rewriting the architecture.
+
+
+3. Target Users
+---------------
+
+3.1 Anonymous visitors
+
+Anonymous visitors can search for universities and professors, read professor
+profiles, browse reviews, and inspect aggregate ratings.
+
+3.2 Registered students
+
+Registered students can submit reviews, edit or delete their own unpublished or
+recent reviews if the product policy allows it, report problematic content, and
+manage their account.
+
+3.3 Moderators
+
+Moderators can review reported content, hide or restore reviews, resolve reports,
+and correct professor or university metadata.
+
+3.4 Administrators
+
+Administrators can manage all core data: universities, departments, professors,
+courses, users, reviews, reports, and moderation decisions.
+
+
+4. MVP Scope
+------------
+
+The MVP should include only the functionality required to make the product useful
+and safe.
+
+4.1 Public pages
+
+- Home page with a prominent search input.
+- Search results for professors and universities.
+- University detail page with basic information and professor list.
+- Professor detail page with average ratings, review list, and review form entry
+  point.
+- Static pages for review rules, privacy policy, and terms of use.
+
+4.2 Authentication
+
+- User registration.
+- Login and logout.
+- Password reset if email is configured.
+- Basic user profile with submitted reviews.
+
+4.3 Universities and professors
+
+- University records with name, city, optional website, and active status.
+- Department or faculty records connected to universities.
+- Professor records connected to one or more departments.
+- Optional courses connected to professors.
+
+4.4 Reviews
+
+A review should collect structured data rather than only free text:
+
+- Professor.
+- Course, if known.
+- Rating score, for example 1-5.
+- Difficulty score, for example 1-5.
+- Whether the student would take this professor again.
+- Attendance strictness or workload tags if included in MVP.
+- Academic term or year, if provided.
+- Written comment.
+- Review status: pending, published, hidden, rejected.
+
+4.5 Review display
+
+Professor pages should show:
+
+- Average overall rating.
+- Average difficulty.
+- Percentage of users who would take the professor again.
+- Number of published reviews.
+- Review list sorted by newest first.
+- Filters by course or rating if simple to implement.
+
+4.6 Moderation
+
+- Users can report reviews.
+- Moderators can see reports in Django Admin.
+- Moderators can hide reviews and mark reports as resolved.
+- Admin actions should avoid deleting data unless legally or operationally
+  necessary. Hiding content is safer for auditability.
+
+4.7 Admin interface
+
+Use Django Admin for MVP operations:
+
+- Manage universities.
+- Manage departments.
+- Manage professors.
+- Manage courses.
+- Manage reviews.
+- Manage reports.
+- Manage users and staff permissions.
+
+
+5. Explicit Non-Goals for MVP
+-----------------------------
+
+The following features should not be built in the first version unless the
+project owner explicitly changes scope:
+
+- Mobile app.
+- React/Vue/Angular SPA.
+- Public REST API.
+- Microservices.
+- Real-time chat.
+- Complex recommendation algorithms.
+- Payment features.
+- Professor self-service dashboards.
+- University representative dashboards.
+- Advanced analytics dashboards.
+- Machine learning moderation.
+
+These features can be reconsidered only after the core review platform is useful,
+moderated, and deployed.
+
+
+6. Recommended Architecture
+---------------------------
+
+6.1 High-level architecture
+
+The recommended architecture is a modular Django monolith:
+
+- Django handles HTTP requests, authentication, business logic, forms, templates,
+  admin, and database access.
+- PostgreSQL stores production data.
+- Django Templates render server-side HTML.
+- HTMX adds small interactive behavior where it clearly improves UX.
+- Static CSS and JavaScript are served by Django in development and by Nginx or
+  WhiteNoise/Nginx in production depending on deployment choice.
+
+This architecture is intentionally simple. It is appropriate for a small project,
+but still mirrors how serious production systems are organized: clear modules,
+clear data ownership, migrations, tests, admin tools, and environment-specific
+settings.
+
+6.2 Suggested Django apps
+
+config
+    Django project configuration: settings, urls, asgi, wsgi.
+
+accounts
+    Registration, login, profile, user-related policies.
+
+universities
+    Universities, departments, faculties, cities, and related metadata.
+
+professors
+    Professor profiles, professor search, professor-course relationships.
+
+reviews
+    Review submission, review display, reports, moderation status, rating
+    aggregation.
+
+core
+    Shared pages and small cross-project utilities if they become necessary.
+    This app should stay small and should not become a dumping ground.
+
+6.3 Why not separate frontend and backend?
+
+A separate frontend would add API design, authentication complexity, CORS, build
+pipelines, duplicated validation, and more deployment moving parts. This project
+mostly needs forms, lists, search, and detail pages. Django Templates are enough.
+
+6.4 Why PostgreSQL?
+
+SQLite is acceptable for local development, but PostgreSQL should be used for
+production because it gives stronger concurrency behavior, better indexing,
+better text search options, and a more realistic production environment.
+
+6.5 Why HTMX?
+
+HTMX can improve selected interactions without turning the project into a SPA.
+Good HTMX use cases:
+
+- Live search suggestions.
+- Filtering reviews without a full page reload.
+- Report review modal submission.
+- Loading more reviews.
+
+HTMX should not be used to hide unclear backend design. The same views should
+remain understandable as regular Django views.
+
+
+7. Core Domain Model
+--------------------
+
+This is the proposed initial domain model. Exact fields can change during
+implementation, but the concepts should remain stable.
+
+University
+
+- id
+- name
+- slug
+- city
+- website_url
+- description
+- is_active
+- created_at
+- updated_at
+
+Department
+
+- id
+- university
+- name
+- slug
+- is_active
+- created_at
+- updated_at
+
+Professor
+
+- id
+- first_name
+- last_name
+- middle_name or display_name if needed
+- slug
+- departments
+- bio
+- is_active
+- created_at
+- updated_at
+
+Course
+
+- id
+- university
+- department
+- code
+- name
+- is_active
+- created_at
+- updated_at
+
+Review
+
+- id
+- professor
+- course
+- author
+- rating
+- difficulty
+- would_take_again
+- comment
+- status
+- created_at
+- updated_at
+- published_at
+
+ReviewReport
+
+- id
+- review
+- reporter
+- reason
+- details
+- status
+- resolved_by
+- resolved_at
+- created_at
+
+Moderation status values should be explicit, for example:
+
+- pending
+- published
+- hidden
+- rejected
+
+
+8. Data and Integrity Rules
+---------------------------
+
+- Professor slugs should be stable and human-readable.
+- University names should be unique enough to avoid duplicates.
+- A professor can belong to more than one department if necessary.
+- Reviews should not be hard-deleted by default.
+- Only published reviews should affect public aggregate ratings.
+- Aggregate ratings must be calculated consistently.
+- Review score fields must be validated at form boundaries.
+- User-submitted text must be escaped by templates and sanitized if rich text is
+  ever introduced.
+- Spam and abusive content should be handled through moderation status and
+  reports.
+
+
+9. User Experience Requirements
+-------------------------------
+
+9.1 Home page
+
+The first screen should focus on search. The user should immediately understand
+that they can search for a professor or university.
+
+9.2 Search
+
+Search should prioritize:
+
+- Exact professor name matches.
+- Partial professor name matches.
+- University name matches.
+- Course code or course name matches if course data exists.
+
+9.3 Professor page
+
+The professor page is the core product surface. It should be clear, scannable,
+and honest. It should not look like a marketing page.
+
+Required sections:
+
+- Professor name.
+- University and department.
+- Rating summary.
+- Difficulty summary.
+- Would-take-again percentage.
+- Review count.
+- CTA to submit a review.
+- Review list.
+
+9.4 Review form
+
+The review form should be structured and not overly long. Users are more likely
+to submit reviews when the form feels fast.
+
+Required form behavior:
+
+- Validate rating ranges.
+- Require meaningful comment length if comments are required.
+- Explain review rules briefly before submission.
+- Submit to pending or published status depending on moderation policy.
+
+9.5 Moderation experience
+
+Moderators should be able to quickly identify:
+
+- New reports.
+- Reported review content.
+- Reporter reason.
+- Review author.
+- Professor affected.
+- Action history or status.
+
+
+10. Security Requirements
+-------------------------
+
+The project should follow standard Django production security practices:
+
+- SECRET_KEY must come from environment variables in production.
+- DEBUG must be false in production.
+- ALLOWED_HOSTS must be configured explicitly.
+- CSRF protection must remain enabled.
+- Authentication should use Django's built-in auth system unless there is a
+  strong reason not to.
+- Passwords must never be stored manually.
+- Admin access must be restricted to staff users.
+- User permissions should be explicit.
+- User-submitted content must be escaped in templates.
+- Production database credentials must not be committed.
+- Email credentials and other secrets must not be committed.
+
+
+11. Privacy and Legal Requirements
+----------------------------------
+
+The platform will store user accounts and user-generated content. Even if the
+audience is small, basic privacy discipline is required:
+
+- Publish a privacy policy.
+- Publish terms or review rules.
+- Allow users to request deletion or anonymization if project policy requires it.
+- Do not expose user email addresses publicly.
+- Do not show private moderation metadata publicly.
+- Keep enough audit information to investigate abuse.
+
+
+12. Testing Requirements
+------------------------
+
+The first implementation should include focused tests for important behavior:
+
+- Model validation for reviews.
+- Rating aggregation uses only published reviews.
+- Anonymous users cannot submit reviews.
+- Authenticated users can submit reviews.
+- Hidden or rejected reviews are not publicly visible.
+- Report submission creates a moderation record.
+- Search returns expected professor and university matches.
+
+The project does not need broad test coverage on day one, but the critical flows
+must be protected because broken reviews or broken moderation can damage trust.
+
+
+13. Deployment Requirements
+---------------------------
+
+For early production, the recommended deployment target is a small VPS on Hetzner
+or DigitalOcean.
+
+The production setup should include:
+
+- PostgreSQL database.
+- Django application server, for example Gunicorn.
+- Nginx as reverse proxy and static file server.
+- HTTPS certificate, for example Let's Encrypt.
+- Environment variables for secrets.
+- Database backup process.
+- Basic logging.
+
+Docker is useful when the deployment process becomes repeatable, but it is not
+required before the MVP works. If Docker is introduced, it should simplify
+deployment rather than add unnecessary complexity.
+
+
+14. Observability and Operations
+--------------------------------
+
+Even a small production system needs minimal operational visibility:
+
+- Application logs for errors.
+- Web server logs.
+- Admin access logs through Django where practical.
+- Database backups.
+- A simple process for restoring from backup.
+- A documented deployment command sequence.
+
+External monitoring can be added later. The first version can start with server
+logs and manual checks.
+
+
+15. Suggested Implementation Roadmap
+------------------------------------
+
+Phase 1: Repair project foundation
+
+- Rename or restore the Django project package to a valid importable name, such
+  as config or rmp.
+- Add dependency management.
+- Add .gitignore.
+- Add environment-based settings for development and production.
+- Ensure the project starts locally.
+
+Phase 2: Build domain models
+
+- Add universities, departments, professors, courses, reviews, and reports.
+- Create migrations.
+- Register models in Django Admin.
+- Add basic model tests.
+
+Phase 3: Build public MVP pages
+
+- Home page.
+- Search results.
+- University detail.
+- Professor detail.
+- Review submission.
+
+Phase 4: Add moderation
+
+- Review statuses.
+- Report workflow.
+- Admin list filters and actions.
+- Public visibility rules.
+
+Phase 5: Prepare production
+
+- PostgreSQL configuration.
+- Static files.
+- Production settings.
+- Deployment documentation.
+- Backup procedure.
+
+
+16. Quality Bar
+---------------
+
+The project should be considered ready for first public use only when:
+
+- It can be installed and run from a fresh clone.
+- The database can be migrated from scratch.
+- A user can register, find a professor, and submit a review.
+- Public pages show only published content.
+- Moderators can hide bad reviews.
+- Admins can manage universities and professors.
+- Secrets are not committed.
+- Basic tests pass.
+- Deployment steps are documented.
+
+
+17. Contributor Guidance
+------------------------
+
+Contributors should keep changes small and directly tied to the current project
+goal. This project does not need speculative abstractions. Prefer simple Django
+patterns, readable models, explicit views, and focused tests.
+
+Before adding a new dependency, contributors should be able to explain:
+
+- What problem it solves.
+- Why Django or the standard library is not enough.
+- How it affects deployment and maintenance.
+
+Before adding a new feature, contributors should be able to explain:
+
+- Which user needs it.
+- Whether it belongs in MVP.
+- How it affects moderation, privacy, and trust.
+
+
+18. Final Recommendation
+------------------------
+
+The best architecture for this project is a production-disciplined Django
+monolith. It is small enough for one developer or a small team to understand,
+but serious enough to support real users, real moderation, and real deployment.
+
+The project should first become a reliable review platform, not a complex
+software architecture exercise. If the product grows, Django can still scale far
+enough for this domain, and individual pieces can be improved later with actual
+usage data.
