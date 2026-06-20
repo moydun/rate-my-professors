@@ -1,20 +1,21 @@
-Rate My Professors Kyrgyzstan - Product and Technical Requirements
-=================================================================
+Rate My Professors Kyrgyzstan - Product Requirements
+====================================================
 
 Document status: MVP implementation baseline
-Target project: local Kyrgyzstan-focused analogue of RateMyProfessors
-Primary stack: Django monolith, Django Templates, HTMX where useful, PostgreSQL
+Target project: Kyrgyzstan-focused analogue of RateMyProfessors
+Architecture reference: PROJECT_ARCHITECTURE.txt
 
-This document is the working baseline for the first production version. It is
-intentionally specific where early ambiguity would slow implementation or create
-deployment risk.
+This document defines product scope, policy decisions, quality expectations, and
+delivery phases. Technical architecture, Django app boundaries, database schema,
+deployment topology, and schema-evolution decisions are documented separately in
+PROJECT_ARCHITECTURE.txt.
 
 Requirement labels:
 
 - Required: must be implemented before first public use.
 - MVP decision: selected default for the first version.
 - Deferred: explicitly outside the first version.
-- Alternative: acceptable only when the deployment or ownership context changes.
+- Alternative: acceptable only when ownership or deployment context changes.
 
 
 1. Project Goal
@@ -54,17 +55,15 @@ core requirements, not future luxuries.
 
 2.2 Small audience, production discipline
 
-The expected audience is not massive. The architecture should therefore stay
-simple. However, the project should still follow production habits used in larger
-systems: clear boundaries, environment-based configuration, database migrations,
-tests for core flows, backups, security defaults, and a deployment process that
-can be repeated.
+The expected audience is not massive. The implementation should stay simple, but
+must still follow production habits: environment-based configuration, database
+migrations, tests for core flows, backups, security defaults, and repeatable
+deployment.
 
 2.3 Server-rendered first
 
-The project does not need a separate SPA frontend. Most pages are content,
-search, forms, and lists. Django Templates with selective HTMX interactions are
-enough for a polished product and much easier to maintain.
+The product mostly needs content pages, search, forms, lists, and moderation.
+The architecture file defines the server-rendered Django approach.
 
 2.4 Admin workflows matter
 
@@ -73,38 +72,55 @@ be practical because review quality depends on them.
 
 2.5 Local relevance
 
-The domain model must support Kyrgyzstan universities, cities, departments,
-faculties, courses, and multilingual content. The MVP public UI should be in
-Russian. User-generated data must support Unicode text in Russian, Kyrgyz, and
-English. Full Kyrgyz UI localization is deferred, but the architecture must not
-block it.
+The product must support Kyrgyzstan universities, cities, departments/faculties,
+courses, and multilingual user-generated content. MVP UI should start in
+Russian. User-generated data must support Russian, Kyrgyz, and English. Full
+Kyrgyz UI localization is deferred.
 
 2.6 Minimal dependencies
 
-Use Django and the Python standard library by default. Add a dependency only when
-it solves a current problem better than Django does and does not meaningfully
-increase deployment complexity.
+Add dependencies only when they solve a current problem better than Django or the
+standard library and do not meaningfully increase deployment complexity.
 
 
-3. MVP Decisions
-----------------
+3. Architecture Source of Truth
+-------------------------------
 
-These decisions remove ambiguity for the first implementation.
+PROJECT_ARCHITECTURE.txt owns:
 
-3.1 Review moderation
+- selected system architecture;
+- Django project package and app boundaries;
+- database model details;
+- decisions derived from the supplied SQLite schema;
+- public querysets and aggregate rules;
+- local and production database choices;
+- static-file and deployment topology;
+- search architecture;
+- security architecture;
+- migration/evolution rules.
+
+This requirements document should not duplicate those details. If a product
+decision requires a schema or architecture change, update PROJECT_ARCHITECTURE.txt
+in the same pull request.
+
+
+4. MVP Product Decisions
+------------------------
+
+4.1 Review moderation
 
 MVP decision: every submitted review starts as pending.
 
 - Pending reviews are visible only to the author, moderators, and admins.
 - Only published reviews appear on public pages and affect aggregate ratings.
 - Moderators/admins can publish, hide, or reject reviews.
-- Hidden and rejected reviews remain in the database for auditability.
+- Hidden and rejected reviews remain stored for auditability.
 - Hard deletion is reserved for legal, privacy, or operational needs.
 
-Automatic publishing can be reconsidered after the platform has enough real
+Automatic publishing can be reconsidered only after the platform has real
 moderation data.
 
-3.2 Review editing and deletion
+4.2 Review editing and deletion
 
 MVP decision:
 
@@ -114,24 +130,19 @@ MVP decision:
   correction, hiding, anonymization, or deletion.
 - Public edit history is deferred.
 
-This keeps the moderation model simple and prevents published content from
-changing after approval without moderator review.
-
-3.3 Review uniqueness
+4.3 Duplicate review policy
 
 MVP decision: prevent obvious duplicate reviews.
 
 - A registered user can have at most one active review for the same professor,
   course, and academic year.
 - If course is unknown, the uniqueness bucket is professor plus academic year.
-- Hidden/rejected historical records can remain for audit, but they should not
-  block a legitimate replacement review if project policy allows it.
+- Hidden/rejected historical records should not block a legitimate replacement
+  review if project policy allows it.
 
-The exact database constraint can be adjusted during implementation, but the
-public behavior should prevent repeated scoring of the same professor by the same
-account for the same learning period.
+The database-level implementation is documented in PROJECT_ARCHITECTURE.txt.
 
-3.4 User accounts and email
+4.4 User accounts and email
 
 MVP decision:
 
@@ -142,132 +153,94 @@ MVP decision:
 - Email verification is recommended for public launch if registration abuse is
   observed, but it is not required for the first private/test deployment.
 
-3.5 Search
+4.5 Search
 
 MVP decision:
 
-- Use database-backed search through Django ORM queries.
 - Search must support professor names, university names, course code, and course
   name.
-- No Elasticsearch, Meilisearch, or external search service in the MVP.
-- PostgreSQL trigram or full-text search may be introduced later if simple
-  queries are not good enough.
+- No external search service in the MVP.
+- Search result pages must be paginated.
 
-3.6 Static files
+Technical search implementation is documented in PROJECT_ARCHITECTURE.txt.
 
-MVP decision for the recommended VPS deployment:
-
-- Django runs behind Gunicorn.
-- Nginx is the reverse proxy.
-- `collectstatic` writes files to `STATIC_ROOT`.
-- Nginx serves `/static/` directly.
-- WhiteNoise is not part of the default VPS deployment.
-
-Alternative:
-
-- WhiteNoise may be used for a PaaS or container deployment where Nginx is not
-  responsible for static files.
-- If WhiteNoise is used, it must be an explicit deployment decision, not a vague
-  fallback.
-
-User-uploaded media is deferred. If media is introduced later, it must not be
-served through WhiteNoise by default; choose Nginx media serving or object
-storage explicitly.
-
-3.7 Database
+4.6 Technical MVP baseline
 
 MVP decision:
 
-- SQLite is acceptable for local development.
-- PostgreSQL is required for production.
-- The application must run migrations from a fresh database.
-- Committed SQLite databases are not acceptable source artifacts.
-
-3.8 Docker
-
-MVP decision:
-
-- Docker is not required before the MVP works locally and can be deployed to a
-  small VPS.
-- Docker may be added later only if it simplifies repeatable deployment.
-
-3.9 HTMX
-
-MVP decision:
-
-- HTMX is allowed only for progressive improvements.
-- Pages must remain understandable as normal Django views.
-- Core review submission, moderation, and search must not require SPA-style
-  client state.
+- The implementation must follow PROJECT_ARCHITECTURE.txt.
+- Production data must not depend on committed local artifacts.
+- Public review display must use published-only visibility rules.
+- The moderation surface for MVP is Django Admin.
 
 
-4. Target Users and Roles
+5. Target Users and Roles
 -------------------------
 
-4.1 Anonymous visitors
+5.1 Anonymous visitors
 
 Anonymous visitors can:
 
-- Search for universities and professors.
-- Read university pages.
-- Read professor pages.
-- Read published reviews.
-- View review rules, privacy policy, and terms.
+- search for universities, professors, and courses;
+- read university pages;
+- read professor pages;
+- read published reviews;
+- view review rules, privacy policy, and terms.
 
 Anonymous visitors cannot:
 
-- Submit reviews.
-- Report reviews.
-- See pending/hidden/rejected content.
-- See private user or moderation metadata.
+- submit reviews;
+- report reviews;
+- see pending/hidden/rejected content;
+- see private user or moderation metadata.
 
-4.2 Registered students
+5.2 Registered students
 
 Registered students can:
 
-- Submit reviews.
-- View their own submitted reviews.
-- Edit or delete their own pending reviews.
-- Report problematic published reviews.
-- Manage basic account information.
-- Use password reset when email is configured.
+- submit reviews;
+- view their own submitted reviews;
+- edit or delete their own pending reviews;
+- report problematic published reviews;
+- manage basic account information;
+- use password reset when email is configured.
 
 Registered students cannot:
 
-- Publish their own reviews without moderation.
-- Edit published reviews directly.
-- See private moderation notes.
-- See other users' email addresses.
+- publish their own reviews without moderation;
+- edit published reviews directly;
+- see private moderation notes;
+- see other users' email addresses.
 
-4.3 Moderators
+5.3 Moderators
 
 Moderators can:
 
-- Review pending reviews.
-- Review reports.
-- Publish, hide, or reject reviews.
-- Resolve reports.
-- Correct professor, course, department, and university metadata if granted
+- review pending reviews;
+- review reports;
+- publish, hide, or reject reviews;
+- resolve reports;
+- correct professor, course, department, and university metadata if granted
   permission.
 
-4.4 Administrators
+5.4 Administrators
 
 Administrators can manage:
 
-- Users and permissions.
-- Universities, departments/faculties, professors, and courses.
-- Reviews, reports, and moderation status.
-- Site policy pages.
-- Operational data needed for launch.
+- users and permissions;
+- universities, departments/faculties, professors, and courses;
+- reviews, reports, and moderation status;
+- site policy pages;
+- operational data needed for launch.
 
 
-5. MVP Scope
+6. MVP Scope
 ------------
 
 The MVP should include only the functionality required to make the product useful
 and safe.
 
-5.1 Public pages
+6.1 Public pages
 
 Required:
 
@@ -280,7 +253,7 @@ Required:
 - Clear empty states for missing reviews or search results.
 - Pagination for long review lists and search results.
 
-5.2 Authentication
+6.2 Authentication
 
 Required:
 
@@ -288,7 +261,7 @@ Required:
 - Login and logout.
 - Password reset for public launch when SMTP is configured.
 - Basic user profile with submitted reviews.
-- Permission checks around review submission, report submission, and admin
+- Permission checks around review submission, report submission, and moderation
   workflows.
 
 Deferred:
@@ -297,91 +270,80 @@ Deferred:
 - Single sign-on through universities.
 - Professor self-service accounts.
 
-5.3 Universities and professors
+6.3 University and professor data
 
 Required:
 
-- University records with name, slug, city, optional website, description, and
-  active status.
-- Department or faculty records connected to universities.
-- Professor records connected to one or more departments.
-- Optional course records connected to university and department.
-- Admin tools to create and correct these records.
+- Admins can create and correct universities.
+- Admins can create and correct departments/faculties.
+- Admins can create and correct professors.
+- Admins can create and correct courses.
+- Public pages must hide inactive records according to architecture visibility
+  rules.
 
-5.4 Reviews
+6.4 Reviews
 
-Required structured fields:
+Required:
 
-- Professor.
-- Course, if known.
-- Academic year or term, if provided.
+- Structured review submission.
 - Overall rating from 1 to 5.
-- Difficulty score from 1 to 5.
+- Difficulty rating from 1 to 5.
 - Whether the student would take this professor again.
-- Attendance strictness or workload tag if included in the first UI.
-- Written comment.
-- Review status: pending, published, hidden, rejected.
-- Author.
-- Created, updated, and published timestamps.
-
-Required behavior:
-
-- Anonymous users cannot submit reviews.
-- Form validation must enforce rating ranges.
-- Comment length must be bounded.
-- New reviews submit to pending status.
+- Optional course when known.
+- Academic year or term if included in the form.
+- Written comment with length bounds.
+- New review status is pending.
 - Only published reviews are public.
 
-5.5 Review display
+6.5 Review display
 
 Professor pages must show:
 
-- Average overall rating.
-- Average difficulty.
-- Percentage of users who would take the professor again.
-- Number of published reviews.
-- Review list sorted by newest published first.
-- Course label when available.
-- Academic year/term when available.
-- Filters by course or rating only if implementation remains simple.
+- average overall rating;
+- average difficulty;
+- percentage of users who would take the professor again;
+- number of published reviews;
+- review list sorted by newest published first;
+- course label when available;
+- academic year/term when available.
 
-Aggregate ratings must ignore pending, hidden, and rejected reviews.
+Aggregate behavior is defined in PROJECT_ARCHITECTURE.txt.
 
-5.6 Reporting and moderation
+6.6 Reporting and moderation
 
 Required:
 
 - Registered users can report published reviews.
-- Report reasons should be structured enough for moderation.
-- Moderators can see reports in Django Admin.
+- Report reasons must be structured enough for moderation.
+- Moderators can review reports in Django Admin.
 - Moderators can hide reviews and mark reports as resolved.
 - Admin actions should avoid deleting data unless legally or operationally
   necessary.
 
-5.7 Admin interface
+6.7 Admin interface
 
 Use Django Admin for MVP operations:
 
-- Manage universities.
-- Manage departments/faculties.
-- Manage professors.
-- Manage courses.
-- Manage reviews.
-- Manage reports.
-- Manage users and staff permissions.
+- manage universities;
+- manage departments/faculties;
+- manage professors;
+- manage courses;
+- manage reviews;
+- manage reports;
+- manage users and staff permissions.
 
 Admin list views should include useful search, filters, ordering, and direct
 links where Django Admin supports them simply.
 
 
-6. Explicit Non-Goals for MVP
+7. Explicit Non-Goals for MVP
 -----------------------------
 
 Do not build these in the first version unless the project owner explicitly
 changes scope:
 
 - Mobile app.
-- React, Vue, Angular, or another SPA frontend.
+- Separate SPA frontend.
 - Public REST API.
 - Microservices.
 - Real-time chat.
@@ -391,9 +353,10 @@ changes scope:
 - University representative dashboards.
 - Advanced analytics dashboards.
 - Machine learning moderation.
-- Elasticsearch or external search service.
+- External search service.
 - User-uploaded professor photos.
 - Public voting on reviews.
+- Saved/bookmarked professors.
 - Anonymous review submission.
 - Browser push notifications.
 
@@ -401,264 +364,10 @@ These features can be reconsidered only after the core review platform is useful
 moderated, and deployed.
 
 
-7. Recommended Architecture
----------------------------
+8. User Experience Requirements
+-------------------------------
 
-7.1 High-level architecture
-
-The recommended architecture is a modular Django monolith:
-
-- Django handles HTTP requests, authentication, business logic, forms, templates,
-  admin, and database access.
-- PostgreSQL stores production data.
-- SQLite is used for local development unless a developer chooses PostgreSQL
-  locally.
-- Django Templates render server-side HTML.
-- HTMX adds small interactive behavior where it clearly improves UX.
-- Static CSS and JavaScript are served by Django in development and by Nginx in
-  the default production deployment.
-
-This architecture is intentionally simple. It is appropriate for a small project,
-but still mirrors how serious production systems are organized: clear modules,
-clear data ownership, migrations, tests, admin tools, and environment-specific
-settings.
-
-7.2 Django project package
-
-Required:
-
-- The Django project package must have a valid Python import name.
-- Use `rmp` as the project package unless there is a clear reason to rename it.
-- `DJANGO_SETTINGS_MODULE`, `ROOT_URLCONF`, `WSGI_APPLICATION`, and
-  `ASGI_APPLICATION` must point to the same valid project package.
-
-7.3 Suggested Django apps
-
-`rmp`
-    Django project configuration: settings, urls, asgi, wsgi.
-
-`accounts`
-    Registration, login, profile, user-related policies.
-
-`universities`
-    Universities, departments, faculties, cities, and related metadata.
-
-`professors`
-    Professor profiles, professor search, professor-course relationships.
-
-`reviews`
-    Review submission, review display, reports, moderation status, rating
-    aggregation.
-
-`core`
-    Shared pages and small cross-project utilities if they become necessary.
-    This app should stay small and must not become a dumping ground.
-
-7.4 Why not separate frontend and backend?
-
-A separate frontend would add API design, authentication complexity, CORS, build
-pipelines, duplicated validation, and more deployment moving parts. This project
-mostly needs forms, lists, search, and detail pages. Django Templates are enough.
-
-7.5 Why PostgreSQL?
-
-SQLite is acceptable for local development, but PostgreSQL should be used for
-production because it gives stronger concurrency behavior, better indexing,
-better text search options, and a more realistic production environment.
-
-7.6 Why HTMX?
-
-HTMX can improve selected interactions without turning the project into a SPA.
-Good HTMX use cases:
-
-- Live search suggestions.
-- Filtering reviews without a full page reload.
-- Report review modal submission.
-- Loading more reviews.
-
-HTMX should not be used to hide unclear backend design. The same views should
-remain understandable as regular Django views.
-
-
-8. Core Domain Model
---------------------
-
-Exact fields can change during implementation, but the concepts should remain
-stable.
-
-8.1 University
-
-- id
-- name
-- slug
-- city
-- website_url
-- description
-- is_active
-- created_at
-- updated_at
-
-Rules:
-
-- Slug is stable and human-readable.
-- Name plus city should be unique enough to avoid obvious duplicates.
-- Inactive universities do not appear in public search by default.
-
-8.2 Department
-
-- id
-- university
-- name
-- slug
-- is_active
-- created_at
-- updated_at
-
-Rules:
-
-- Department belongs to exactly one university.
-- Department slug is unique within a university.
-
-8.3 Professor
-
-- id
-- first_name
-- last_name
-- middle_name or display_name if needed
-- slug
-- departments
-- bio
-- is_active
-- created_at
-- updated_at
-
-Rules:
-
-- A professor can belong to more than one department.
-- Public display name should be consistent.
-- Slug should remain stable after creation unless an admin intentionally changes
-  it.
-
-8.4 Course
-
-- id
-- university
-- department
-- code
-- name
-- is_active
-- created_at
-- updated_at
-
-Rules:
-
-- Course code plus university should be unique when code is available.
-- Course can be optional on a review because students may not know the official
-  code.
-
-8.5 Review
-
-- id
-- professor
-- course
-- author
-- academic_year
-- term
-- rating
-- difficulty
-- would_take_again
-- attendance_strictness or workload tag if included in MVP UI
-- comment
-- status
-- moderation_note
-- moderated_by
-- moderated_at
-- created_at
-- updated_at
-- published_at
-
-Status values:
-
-- pending
-- published
-- hidden
-- rejected
-
-Rules:
-
-- Only published reviews are public.
-- Only published reviews affect aggregates.
-- Hidden and rejected reviews remain available to staff.
-
-8.6 ReviewReport
-
-- id
-- review
-- reporter
-- reason
-- details
-- status
-- resolved_by
-- resolved_at
-- created_at
-
-Status values:
-
-- open
-- resolved
-- rejected
-
-Reason values should be explicit, for example:
-
-- spam
-- abusive_content
-- personal_data
-- false_or_misleading
-- duplicate
-- other
-
-8.7 User model
-
-MVP decision:
-
-- Use Django's built-in User model unless there is a concrete need for a custom
-  user model before the first migration.
-- If a custom user model is desired, decide before creating user-related
-  production migrations.
-
-
-9. Data and Integrity Rules
----------------------------
-
-Required:
-
-- Professor slugs should be stable and human-readable.
-- University names should be unique enough to avoid duplicates.
-- A professor can belong to more than one department if necessary.
-- Reviews should not be hard-deleted by default.
-- Only published reviews should affect public aggregate ratings.
-- Aggregate ratings must be calculated consistently.
-- Review score fields must be validated at form boundaries.
-- User-submitted text must be escaped by templates.
-- Rich text is not allowed in the MVP.
-- Spam and abusive content should be handled through moderation status and
-  reports.
-- Timestamps should use timezone-aware values.
-- Public lists should exclude inactive universities, departments, professors, and
-  courses unless staff is viewing them.
-- Admins should be able to correct data without editing database rows manually.
-
-Deferred:
-
-- Historical merge tools for duplicate professors.
-- Bulk CSV import UI.
-- Public change history.
-
-
-10. User Experience Requirements
---------------------------------
-
-10.1 General UI
+8.1 General UI
 
 Required:
 
@@ -669,7 +378,7 @@ Required:
 - Forms should show validation errors near the relevant field.
 - Public pages should work without JavaScript for core flows.
 
-10.2 Home page
+8.2 Home page
 
 The first screen should focus on search. The user should immediately understand
 that they can search for a professor, university, or course.
@@ -681,23 +390,22 @@ Required:
 - Optional links to popular or recently reviewed professors only after real data
   exists.
 
-10.3 Search
+8.3 Search
 
 Search should prioritize:
 
-- Exact professor name matches.
-- Partial professor name matches.
-- University name matches.
-- Course code or course name matches if course data exists.
+- exact professor name matches;
+- partial professor name matches;
+- university name matches;
+- course code or course name matches if course data exists.
 
 Required:
 
-- Reasonable handling of empty query.
-- Minimum query length if live search is implemented.
-- Pagination for result sets.
-- No external search service in MVP.
+- reasonable handling of empty query;
+- minimum query length if live search is implemented;
+- pagination for result sets.
 
-10.4 Professor page
+8.4 Professor page
 
 Required sections:
 
@@ -713,7 +421,7 @@ Required sections:
 
 The page should be clear, scannable, and honest.
 
-10.5 Review form
+8.5 Review form
 
 Required:
 
@@ -727,22 +435,22 @@ Required:
 The form should be fast to complete. Do not ask for information that is not used
 in the MVP.
 
-10.6 Moderator experience
+8.6 Moderator experience
 
 Moderators should be able to quickly identify:
 
-- New pending reviews.
-- New reports.
-- Reported review content.
-- Reporter reason.
-- Review author.
-- Professor affected.
-- Current review status.
-- Previous moderation note if available.
+- new pending reviews;
+- new reports;
+- reported review content;
+- reporter reason;
+- review author;
+- professor affected;
+- current review status;
+- previous moderation note if available.
 
 
-11. Moderation and Content Policy
----------------------------------
+9. Moderation and Content Policy
+--------------------------------
 
 Required review rules:
 
@@ -767,38 +475,10 @@ Deferred:
 - Complex appeal workflow.
 
 
-12. Security Requirements
--------------------------
+10. Privacy, Legal, and Security Requirements
+---------------------------------------------
 
-The project must follow standard Django production security practices:
-
-- `SECRET_KEY` must come from environment variables in production.
-- `DEBUG` must be false in production.
-- `ALLOWED_HOSTS` must be configured explicitly in production.
-- CSRF protection must remain enabled.
-- Authentication should use Django's built-in auth system unless there is a
-  strong reason not to.
-- Passwords must never be stored manually.
-- Admin access must be restricted to staff users.
-- User permissions should be explicit.
-- User-submitted content must be escaped in templates.
-- Production database credentials must not be committed.
-- Email credentials and other secrets must not be committed.
-- `SECURE_SSL_REDIRECT`, secure cookies, and proxy SSL headers should be enabled
-  in production when HTTPS termination is configured.
-- `manage.py check --deploy` should be part of production readiness checks.
-
-MVP decision:
-
-- Local development may use safe development defaults.
-- Production must be configured through environment variables.
-
-
-13. Privacy and Legal Requirements
-----------------------------------
-
-The platform stores user accounts and user-generated content. Even if the
-audience is small, basic privacy discipline is required.
+10.1 Privacy and legal
 
 Required:
 
@@ -817,13 +497,21 @@ MVP decision:
 - Publicly shown reviews should not display the author's email or legal name.
 - Use a username or anonymous label for public review attribution.
 
-Deferred:
+10.2 Security
 
-- Automated self-service data export.
-- Complex GDPR-style dashboard.
+Required:
+
+- Follow Django production security practices.
+- Keep CSRF protection enabled.
+- Use Django password hashing.
+- Restrict admin access to staff users.
+- Escape user-submitted content in templates.
+- Do not commit secrets or production credentials.
+
+The detailed security architecture is defined in PROJECT_ARCHITECTURE.txt.
 
 
-14. Testing Requirements
+11. Testing Requirements
 ------------------------
 
 The first implementation should include focused tests for important behavior.
@@ -836,7 +524,7 @@ Required model and service behavior tests:
 - Duplicate review policy works.
 - Public querysets exclude inactive records.
 
-Required view/form tests:
+Required view/form tests when those surfaces are added:
 
 - Anonymous users cannot submit reviews.
 - Authenticated users can submit reviews.
@@ -851,128 +539,28 @@ Required admin/moderation tests where practical:
 - Non-staff cannot access moderation views.
 - Report resolution records resolver and timestamp.
 
-The project does not need broad test coverage on day one, but broken reviews or
-broken moderation can damage trust. Those flows need tests early.
+The architecture file lists current and future test coverage in more detail.
 
 
-15. Deployment Requirements
----------------------------
-
-For early production, the recommended deployment target is a small VPS on Hetzner
-or DigitalOcean.
-
-Required production setup:
-
-- PostgreSQL database.
-- Django application server, for example Gunicorn.
-- Nginx as reverse proxy and static file server.
-- HTTPS certificate, for example Let's Encrypt.
-- Environment variables for secrets and production configuration.
-- Database backup process.
-- Basic logging.
-- Documented deployment command sequence.
-- Documented restore procedure.
-
-15.1 Default VPS static file setup
-
-Required:
-
-- Run `python manage.py collectstatic` during deployment.
-- Set `STATIC_ROOT` in Django settings.
-- Configure Nginx to serve `/static/` from `STATIC_ROOT`.
-- Do not rely on Django development static serving in production.
-
-15.2 Process management
-
-Recommended:
-
-- Use systemd to run Gunicorn.
-- Keep Gunicorn bound to a local Unix socket or localhost port.
-- Let Nginx handle public HTTP/HTTPS traffic.
-
-15.3 Environment variables
-
-Required production variables:
-
-- `DJANGO_SECRET_KEY`
-- `DJANGO_DEBUG`
-- `DJANGO_ALLOWED_HOSTS`
-- `DATABASE_URL` or equivalent database settings
-- Email backend settings if public registration/password reset is enabled
-
-15.4 Backups
-
-Required:
-
-- Automated PostgreSQL backup.
-- Backup retention policy.
-- Manual restore command documented.
-- Restore process tested before public launch.
-
-15.5 Docker
-
-Docker is useful when the deployment process becomes repeatable, but it is not
-required before the MVP works. If Docker is introduced, it should simplify
-deployment rather than add unnecessary complexity.
-
-
-16. Observability and Operations
---------------------------------
-
-Even a small production system needs minimal operational visibility.
-
-Required:
-
-- Application logs for errors.
-- Web server logs.
-- Admin access logs through Django where practical.
-- Database backups.
-- A simple process for restoring from backup.
-- A documented deployment command sequence.
-
-Recommended after first launch:
-
-- Uptime monitoring.
-- Error tracking.
-- Disk usage alerting.
-- Backup success alerting.
-
-External monitoring can be added later. The first version can start with server
-logs and manual checks, but backup failure must not be invisible long-term.
-
-
-17. Implementation Roadmap and Acceptance Criteria
+12. Implementation Roadmap and Acceptance Criteria
 --------------------------------------------------
 
-17.1 Phase 1: Repair project foundation
+12.1 Phase 1: Repair project foundation
 
 Goal: the project can be cloned, installed, checked, migrated, tested, and run
 without local machine-specific state.
 
-Required tasks:
+Acceptance criteria:
 
-- Use a valid Django project package name, preferably `rmp`.
-- Ensure `manage.py`, `settings.py`, `urls.py`, `asgi.py`, and `wsgi.py` all
-  reference the same package.
-- Add dependency management, at minimum `requirements.txt`.
-- Add `.gitignore`.
-- Remove committed local artifacts such as `db.sqlite3` and `__pycache__`.
-- Add environment-based settings for development and production.
-- Define `STATIC_URL` and `STATIC_ROOT`.
-- Ensure the project starts locally.
-- Update README with fresh-clone setup commands.
-
-Acceptance criteria from a fresh clone:
-
-- `python -m venv .venv` succeeds.
-- Installing dependencies from `requirements.txt` succeeds.
+- Project package imports successfully.
+- Dependencies install from `requirements.txt`.
 - `python manage.py check` exits successfully.
 - `python manage.py migrate` exits successfully.
 - `python manage.py test` exits successfully.
 - `python manage.py runserver` starts the development server successfully.
 - Opening `http://127.0.0.1:8000/` reaches Django without import errors.
 
-17.2 Phase 2: Build domain models
+12.2 Phase 2: Build domain models
 
 Required tasks:
 
@@ -988,7 +576,7 @@ Acceptance criteria:
 - Admin can create and moderate a review.
 - Aggregate rating code counts only published reviews.
 
-17.3 Phase 3: Build public MVP pages
+12.3 Phase 3: Build public MVP pages
 
 Required tasks:
 
@@ -1006,14 +594,14 @@ Acceptance criteria:
 - Submitted review is pending.
 - Professor page aggregates only published reviews.
 
-17.4 Phase 4: Add moderation
+12.4 Phase 4: Add moderation workflows
 
 Required tasks:
 
-- Review statuses.
-- Report workflow.
+- Review/report forms where needed.
 - Admin list filters and actions.
 - Public visibility rules.
+- Moderator workflow checks.
 
 Acceptance criteria:
 
@@ -1022,27 +610,25 @@ Acceptance criteria:
 - Hidden/rejected content disappears from public pages.
 - Moderation decisions preserve audit fields.
 
-17.5 Phase 5: Prepare production
+12.5 Phase 5: Prepare production
 
 Required tasks:
 
-- PostgreSQL configuration.
-- Static files through `collectstatic` and Nginx.
-- Production settings.
-- Deployment documentation.
+- Production database configuration.
+- Static files and deployment documentation.
+- Production settings review.
 - Backup procedure.
 - `manage.py check --deploy` review.
 
 Acceptance criteria:
 
 - Production environment does not use committed secrets.
-- `DEBUG` is false.
-- `ALLOWED_HOSTS` is explicit.
-- Static files are served by Nginx.
+- Public deployment has explicit host/security configuration.
+- Static files are served according to PROJECT_ARCHITECTURE.txt.
 - Database backup and restore commands are documented and tested.
 
 
-18. Quality Bar
+13. Quality Bar
 ---------------
 
 The project is ready for first private testing when:
@@ -1067,37 +653,28 @@ The project is ready for first public use only when:
 - Backup and restore are documented and tested.
 
 
-19. Contributor Guidance
+14. Contributor Guidance
 ------------------------
 
 Contributors should keep changes small and directly tied to the current project
 goal. This project does not need speculative abstractions. Prefer simple Django
 patterns, readable models, explicit views, and focused tests.
 
-Before adding a new dependency, contributors should be able to explain:
+Before adding a dependency, contributors should be able to explain:
 
 - What problem it solves.
 - Why Django or the standard library is not enough.
 - How it affects deployment and maintenance.
 
-Before adding a new feature, contributors should be able to explain:
+Before adding a feature, contributors should be able to explain:
 
 - Which user needs it.
 - Whether it belongs in MVP.
 - How it affects moderation, privacy, and trust.
 
-When a requirement is unclear, resolve it by updating this document first. Do not
-leave implementation-critical decisions hidden in code comments or chat history.
+When a requirement is unclear:
 
-
-20. Final Recommendation
-------------------------
-
-The best architecture for this project is a production-disciplined Django
-monolith. It is small enough for one developer or a small team to understand, but
-serious enough to support real users, real moderation, and real deployment.
-
-The project should first become a reliable review platform, not a complex
-software architecture exercise. If the product grows, Django can still scale far
-enough for this domain, and individual pieces can be improved later with actual
-usage data.
+- update PROJECT_REQUIREMENTS.txt for product/policy decisions;
+- update PROJECT_ARCHITECTURE.txt for technical architecture/schema decisions;
+- do not leave implementation-critical decisions hidden in code comments or chat
+  history.
