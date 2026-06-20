@@ -93,14 +93,6 @@ class Review(models.Model):
     def __str__(self):
         return f'{self.professor} review by {self.author}'
 
-    @property
-    def is_public(self):
-        return (
-            self.status == self.Status.PUBLISHED
-            and self.professor.is_active
-            and self.professor.departments.public().exists()
-        )
-
     def publish(self, moderator):
         self.status = self.Status.PUBLISHED
         self.moderated_by = moderator

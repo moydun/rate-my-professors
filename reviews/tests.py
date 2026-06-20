@@ -1,9 +1,14 @@
+from datetime import timedelta
+from types import SimpleNamespace
+
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.test import TestCase
+from django.utils import timezone
 
 from professors.models import Course, Professor
+from reviews.admin import publish_reviews, resolve_reports
 from reviews.models import Review, ReviewReport
 from universities.models import Department, University
 
@@ -49,7 +54,6 @@ class ReviewModelTests(TestCase):
         review = self.make_review()
 
         self.assertEqual(review.status, Review.Status.PENDING)
-        self.assertFalse(review.is_public)
         self.assertEqual(Review.objects.public().count(), 0)
 
     def test_review_validation_rejects_invalid_scores_and_short_comments(self):
@@ -112,13 +116,11 @@ class ReviewModelTests(TestCase):
         published.publish(self.moderator)
         published.save()
 
-        self.assertTrue(published.is_public)
         self.assertEqual(list(Review.objects.public()), [published])
 
         published.hide(self.moderator)
         published.save()
 
-        self.assertFalse(published.is_public)
         self.assertEqual(Review.objects.public().count(), 0)
 
         published.publish(self.moderator)
@@ -126,7 +128,6 @@ class ReviewModelTests(TestCase):
         self.professor.is_active = False
         self.professor.save()
 
-        self.assertFalse(published.is_public)
         self.assertEqual(Review.objects.public().count(), 0)
 
     def test_duplicate_active_review_is_rejected_until_original_is_hidden(self):
@@ -157,6 +158,42 @@ class ReviewModelTests(TestCase):
 
         report.resolve(self.moderator)
         report.save()
+
+        self.assertEqual(report.status, ReviewReport.Status.RESOLVED)
+        self.assertEqual(report.resolved_by, self.moderator)
+        self.assertIsNotNone(report.resolved_at)
+
+    def test_admin_publish_action_updates_batch_without_overwriting_existing_published_at(self):
+        request = SimpleNamespace(user=self.moderator)
+        pending = self.make_review()
+        already_published = self.make_review(author=self.second_author, academic_year='2024')
+        existing_published_at = timezone.now() - timedelta(days=10)
+        already_published.status = Review.Status.PUBLISHED
+        already_published.published_at = existing_published_at
+        already_published.save()
+
+        publish_reviews(None, request, Review.objects.filter(pk__in=[pending.pk, already_published.pk]))
+
+        pending.refresh_from_db()
+        already_published.refresh_from_db()
+
+        self.assertEqual(pending.status, Review.Status.PUBLISHED)
+        self.assertEqual(pending.moderated_by, self.moderator)
+        self.assertIsNotNone(pending.published_at)
+        self.assertEqual(already_published.published_at, existing_published_at)
+
+    def test_admin_resolve_reports_action_updates_batch(self):
+        request = SimpleNamespace(user=self.moderator)
+        review = self.make_review()
+        report = ReviewReport.objects.create(
+            review=review,
+            reporter=self.second_author,
+            reason=ReviewReport.Reason.OTHER,
+        )
+
+        resolve_reports(None, request, ReviewReport.objects.filter(pk=report.pk))
+
+        report.refresh_from_db()
 
         self.assertEqual(report.status, ReviewReport.Status.RESOLVED)
         self.assertEqual(report.resolved_by, self.moderator)

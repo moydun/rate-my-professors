@@ -1,27 +1,43 @@
 from django.contrib import admin
+from django.db.models import DateTimeField, Value
+from django.db.models.functions import Coalesce
+from django.utils import timezone
 
 from .models import Review, ReviewReport
 
 
 @admin.action(description='Publish selected reviews')
 def publish_reviews(modeladmin, request, queryset):
-    for review in queryset:
-        review.publish(request.user)
-        review.save(update_fields=['status', 'moderated_by', 'moderated_at', 'published_at', 'updated_at'])
+    now = timezone.now()
+    queryset.update(
+        status=Review.Status.PUBLISHED,
+        moderated_by_id=request.user.pk,
+        moderated_at=now,
+        published_at=Coalesce('published_at', Value(now), output_field=DateTimeField()),
+        updated_at=now,
+    )
 
 
 @admin.action(description='Hide selected reviews')
 def hide_reviews(modeladmin, request, queryset):
-    for review in queryset:
-        review.hide(request.user)
-        review.save(update_fields=['status', 'moderated_by', 'moderated_at', 'updated_at'])
+    now = timezone.now()
+    queryset.update(
+        status=Review.Status.HIDDEN,
+        moderated_by_id=request.user.pk,
+        moderated_at=now,
+        updated_at=now,
+    )
 
 
 @admin.action(description='Reject selected reviews')
 def reject_reviews(modeladmin, request, queryset):
-    for review in queryset:
-        review.reject(request.user)
-        review.save(update_fields=['status', 'moderated_by', 'moderated_at', 'updated_at'])
+    now = timezone.now()
+    queryset.update(
+        status=Review.Status.REJECTED,
+        moderated_by_id=request.user.pk,
+        moderated_at=now,
+        updated_at=now,
+    )
 
 
 @admin.register(Review)
@@ -35,9 +51,12 @@ class ReviewAdmin(admin.ModelAdmin):
 
 @admin.action(description='Resolve selected reports')
 def resolve_reports(modeladmin, request, queryset):
-    for report in queryset:
-        report.resolve(request.user)
-        report.save(update_fields=['status', 'resolved_by', 'resolved_at'])
+    now = timezone.now()
+    queryset.update(
+        status=ReviewReport.Status.RESOLVED,
+        resolved_by_id=request.user.pk,
+        resolved_at=now,
+    )
 
 
 @admin.register(ReviewReport)
