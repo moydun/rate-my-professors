@@ -1,0 +1,46 @@
+{% extends "reviews/base.html" %}{% load i18n l10n %}
+{% block title %}{% translate "Мой профиль" %} — ProfLens{% endblock %}
+{% block content %}
+<nav class="breadcrumbs" aria-label="{% translate 'Хлебные крошки' %}">
+  <ol>
+    <li><a href="{% url 'home' %}">{% translate "Главная" %}</a></li>
+    <li aria-current="page">{% translate "Мой профиль" %}</li>
+  </ol>
+</nav>
+<h1>{% translate "Мой профиль" %}</h1>
+<p class="sub">{{ user.email|default:user.username }}</p>
+
+<h2>{% translate "Мои отзывы" %}</h2>
+{% for item in reviews %}
+{% with r=item.review prof=item.prof school=item.school %}
+<article class="review profile-review">
+  <div class="tile small {% if r.overall >= 4 %}good{% elif r.overall >= 3 %}mid{% else %}bad{% endif %}">{{ r.overall|localize }}</div>
+  <div>
+    <p>{% translate "Статус модерации" %}:
+      <span class="status-badge {{ r.status }}">
+        {% if r.status == "pending" %}{% translate "На проверке" %}{% elif r.status == "approved" %}{% translate "Опубликован" %}{% else %}{% translate "Отклонён" %}{% endif %}
+      </span>
+    </p>
+    <p class="facts-line"><strong>{{ r.course }}</strong>{% if r.term %}, {{ r.term }}{% endif %}.
+      {% translate "Сложность" %} {{ r.difficulty|localize }}. {% if r.would_take_again %}{% translate "Пойду снова." %}{% else %}{% translate "Не пойду снова." %}{% endif %}
+      {% if r.grade %}{% translate "Оценка:" %} {% translate r.grade %}.{% endif %}</p>
+    <p>
+      {% if prof.status == "approved" %}<a href="{% url 'professor' prof.slug %}">{{ prof.full_name }}</a>{% else %}{{ prof.full_name }}{% endif %}
+      — {{ school.name }}
+    </p>
+    {% if r.created_at %}<p class="review-date muted">{% translate "Дата отзыва:" %} <time datetime="{{ r.created_at|date:'c' }}">{{ r.created_at|date:"DATE_FORMAT" }}</time></p>{% endif %}
+    <p>{{ r.comment }}</p>
+    <p><a href="{% url 'review_edit' r.id %}">{% translate "Изменить" %}</a>
+      <a href="{% url 'review_delete' r.id %}">{% translate "Удалить" %}</a></p>
+    {% if r.tags %}<p class="tags">{% for tag in r.tags %}{% translate tag %}{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+  </div>
+</article>
+{% endwith %}
+{% empty %}
+<section class="empty empty-state" role="status">
+  <p>{% translate "Вы ещё не оставляли отзывов." %}</p>
+  <a class="btn empty-state-action" href="{% url 'home' %}">{% translate "Вернуться на главную" %}</a>
+</section>
+{% endfor %}
+{% endblock %}
+{% block page_tools %}{% include "reviews/_back_to_top.html" %}{% endblock %}

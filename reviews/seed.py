@@ -1,4 +1,11 @@
 """Демо-данные для Кыргызстана. Сбрасываются при каждом перезапуске в memory-режиме."""
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .django_repo import DjangoRepository
+    from .repository import InMemoryRepository
 
 SCHOOLS = [
     ("Кыргызский национальный университет им. Ж. Баласагына", "Бишкек"),
@@ -86,9 +93,10 @@ REVIEWS = [  # (prof index, course, term, overall, difficulty, take again, grade
 ]
 
 
-def seed(repo):
+def seed(repo: InMemoryRepository | DjangoRepository) -> None:
+    """Populate ``repo`` with the built-in demo schools, professors and reviews."""
     schools = [repo.add_school(n, c) for n, c in SCHOOLS]
-    profs = [repo.add_professor(schools[s].id, f, l, d, t) for s, f, l, d, t in PROFESSORS]
+    profs = [repo.add_professor(schools[s].id, f, last, d, t) for s, f, last, d, t in PROFESSORS]
     for pi, course, term, overall, diff, wta, grade, comment, tags in REVIEWS:
         repo.add_review(profs[pi].id, {
             "course": course, "term": term, "overall": overall, "difficulty": diff,

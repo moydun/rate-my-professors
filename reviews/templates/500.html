@@ -1,0 +1,12 @@
+{% extends "reviews/base.html" %}{% load i18n %}
+{% block title %}{% translate "Ошибка сервера" %} — ProfLens{% endblock %}
+{% block content %}
+<section class="error-page">
+  <div class="error-card" role="alert">
+    <p class="error-code" aria-hidden="true">500</p>
+    <h1>{% translate "Ошибка сервера" %}</h1>
+    <p class="muted">{% translate "Что-то пошло не так. Мы уже работаем над этим — попробуйте позже." %}</p>
+    <p class="error-actions"><a href="{% url 'home' %}">{% translate "Вернуться на главную" %}</a></p>
+  </div>
+</section>
+{% endblock %}

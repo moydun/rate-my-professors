@@ -1,52 +1,68 @@
-{% extends "reviews/base.html" %}{% load i18n %}
+{% extends "reviews/base.html" %}{% load i18n l10n %}
 {% block title %}{{ prof.full_name }} — ProfLens{% endblock %}
+{% block description %}{% blocktranslate with name=prof.full_name dept=prof.department school=school.name %}Отзывы студентов о преподавателе {{ name }} ({{ dept }}, {{ school }}): рейтинг, сложность и советы.{% endblocktranslate %}{% endblock %}
+{% block og_title %}{{ prof.full_name }} — ProfLens{% endblock %}
+{% block og_description %}{% blocktranslate with name=prof.full_name dept=prof.department school=school.name %}Отзывы студентов о преподавателе {{ name }} ({{ dept }}, {{ school }}): рейтинг, сложность и советы.{% endblocktranslate %}{% endblock %}
 {% block content %}
+<nav class="breadcrumbs" aria-label="{% translate 'Хлебные крошки' %}">
+  <ol>
+    <li><a href="{% url 'home' %}">{% translate "Главная" %}</a></li>
+    <li><a href="{% url 'school_detail' school.slug %}">{{ school.name }}</a></li>
+    <li aria-current="page">{{ prof.full_name }}</li>
+  </ol>
+</nav>
 <div class="headline">
-  <div class="tile big {{ stats.tone }}">{% if stats.count %}{{ stats.overall|floatformat:1 }}{% else %}-{% endif %}</div>
+  <div class="tile big {{ stats.tone }}">{% if stats.count %}{{ stats.overall|floatformat:1|localize }}{% else %}-{% endif %}</div>
   <div>
     <h1>{{ prof.full_name }}</h1>
-    <p class="sub">{{ prof.title }} — {{ prof.department }}, <a href="{% url 'school_detail' school.slug %}">{{ school.name }}</a></p>
+    <p class="sub">{% translate prof.title %} — {{ prof.department }}, <a href="{% url 'school_detail' school.slug %}">{{ school.name }}</a></p>
   </div>
+  {% if stats.count %}
+  <span class="stars" role="img" aria-label="{% blocktranslate with rating=stats.overall %}Рейтинг {{ rating }} из 5{% endblocktranslate %}"><span aria-hidden="true">★★★★★</span><span class="s-fill" aria-hidden="true" style="width:{% widthratio stats.overall 5 100 %}%">★★★★★</span></span>
+  {% else %}
+  <span class="stars" role="img" aria-label="{% translate 'Нет оценок' %}"><span aria-hidden="true">★★★★★</span></span>
+  {% endif %}
 </div>
 
 {% if stats.count %}
 <dl class="facts">
-  <div><dt>{% translate "Пойдут снова" %}</dt><dd>{{ stats.wta_pct }}%</dd></div>
-  <div><dt>{% translate "Сложность" %}</dt><dd>{{ stats.difficulty|floatformat:1 }} / 5</dd></div>
-  <div><dt>{% translate "Отзывов" %}</dt><dd>{{ stats.count }}</dd></div>
+  <div><dt>{% translate "Пойдут снова" %}</dt><dd>{{ stats.wta_pct|localize }}%</dd></div>
+  <div><dt>{% translate "Сложность" %}</dt><dd>{{ stats.difficulty|floatformat:1|localize }} / 5</dd></div>
+  <div><dt>{% translate "Отзывов" %}</dt><dd>{{ stats.count|localize }}</dd></div>
 </dl>
-<ul class="dist" aria-label="{% translate 'Распределение оценок' %}">
+{% endif %}
+<ul class="dist{% if not stats.count %} dist--empty{% endif %}" aria-label="{% translate 'Распределение оценок' %}">
   {% for d in stats.distribution %}
-  <li><span>{{ d.score }}</span><span class="bar"><i style="width:{{ d.pct }}%"></i></span><span>{{ d.count }}</span></li>
+  <li><span>{{ d.score|localize }}</span><span class="bar"><i style="width:{{ d.pct }}%"></i></span><span>{{ d.count|localize }}</span></li>
   {% endfor %}
 </ul>
-{% if stats.top_tags %}<p class="tags">{% translate "Студенты отмечают:" %} {{ stats.top_tags|join:", " }}</p>{% endif %}
-{% endif %}
+{% if stats.count and stats.top_tags %}<p class="tags">{% translate "Студенты отмечают:" %} {% for tag in stats.top_tags %}{% translate tag %}{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
 
 <p><a class="btn" href="{% url 'review_new' prof.slug %}">{% translate "Оценить преподавателя" %}</a></p>
 
 <h2>{% translate "Отзывы" %}</h2>
 {% if reviews %}
 <p class="sort">{% translate "Сортировка:" %}
-  {% if sort == "newest" %}<strong>{% translate "сначала новые" %}</strong>{% else %}<a href="?sort=newest">{% translate "сначала новые" %}</a>{% endif %},
-  {% if sort == "helpful" %}<strong>{% translate "сначала полезные" %}</strong>{% else %}<a href="?sort=helpful">{% translate "сначала полезные" %}</a>{% endif %}
+  {% for value, label in sort_options %}{% if not forloop.first %}, {% endif %}{% if sort == value %}<strong>{% translate label %}</strong>{% else %}<a href="?sort={{ value }}">{% translate label %}</a>{% endif %}{% endfor %}
 </p>
 {% for r in reviews %}
 <article class="review" id="review-{{ r.id }}">
-  <div class="tile small {% if r.overall >= 4 %}good{% elif r.overall >= 3 %}mid{% else %}bad{% endif %}">{{ r.overall }}</div>
+  <div class="tile small {% if r.overall >= 4 %}good{% elif r.overall >= 3 %}mid{% else %}bad{% endif %}">{{ r.overall|localize }}</div>
   <div>
     <p class="facts-line"><strong>{{ r.course }}</strong>{% if r.term %}, {{ r.term }}{% endif %}.
-      {% translate "Сложность" %} {{ r.difficulty }}. {% if r.would_take_again %}{% translate "Пойду снова." %}{% else %}{% translate "Не пойду снова." %}{% endif %}
-      {% if r.grade %}{% translate "Оценка:" %} {{ r.grade }}.{% endif %}</p>
+      {% translate "Сложность" %} {{ r.difficulty|localize }}. {% if r.would_take_again %}{% translate "Пойду снова." %}{% else %}{% translate "Не пойду снова." %}{% endif %}
+      {% if r.grade %}{% translate "Оценка:" %} {% translate r.grade %}.{% endif %}</p>
+    {% if r.created_at %}<p class="review-date muted">{% translate "Дата отзыва:" %} <time datetime="{{ r.created_at|date:'c' }}">{{ r.created_at|date:"DATE_FORMAT" }}</time></p>{% endif %}
     <p>{{ r.comment }}</p>
-    {% if r.tags %}<p class="tags">{{ r.tags|join:", " }}</p>{% endif %}
+    {% if r.tags %}<p class="tags">{% for tag in r.tags %}{% translate tag %}{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
     <div class="votes">
       <form method="post" action="{% url 'review_vote' r.id %}">{% csrf_token %}
-        <button name="vote" value="up">{% translate "Полезно" %} {{ r.helpful }}</button>
-        <button name="vote" value="down">{% translate "Бесполезно" %} {{ r.not_helpful }}</button>
+        <button type="submit" name="vote" value="up" aria-label="{% translate 'Полезно' %}: {{ r.course }} ({{ r.helpful|localize }})">{% translate "Полезно" %} {{ r.helpful|localize }}</button>
+        <button type="submit" name="vote" value="down" aria-label="{% translate 'Бесполезно' %}: {{ r.course }} ({{ r.not_helpful|localize }})">{% translate "Бесполезно" %} {{ r.not_helpful|localize }}</button>
       </form>
       <form method="post" action="{% url 'review_report' r.id %}">{% csrf_token %}
-        <button class="link-btn" type="submit">{% translate "Пожаловаться" %}</button>
+        {{ report_form.reason }}
+        <button class="link-btn" type="submit" aria-label="{% translate 'Пожаловаться' %}: {{ r.course }}">{% translate "Пожаловаться" %}</button>
       </form>
     </div>
   </div>
@@ -54,12 +70,17 @@
 {% endfor %}
 {% if page_obj %}
 <div class="pagination">
-  {% if page_obj.has_previous %}<a href="?sort={{ sort }}&page={{ page_obj.previous_page_number }}">{% translate "Назад" %}</a>{% endif %}
-  <span>{% blocktranslate with n=page_obj.number t=page_obj.paginator.num_pages %}Страница {{ n }} из {{ t }}{% endblocktranslate %}</span>
-  {% if page_obj.has_next %}<a href="?sort={{ sort }}&page={{ page_obj.next_page_number }}">{% translate "Вперёд" %}</a>{% endif %}
+  {% if page_obj.has_previous %}<a href="?sort={{ sort }}&page={{ page_obj.previous_page_number }}" aria-label="{% blocktranslate with n=page_obj.previous_page_number t=page_obj.paginator.num_pages %}Страница {{ n }} из {{ t }}{% endblocktranslate %}">{% translate "Назад" %}</a>{% endif %}
+  <span aria-current="page">{% blocktranslate with n=page_obj.number t=page_obj.paginator.num_pages %}Страница {{ n }} из {{ t }}{% endblocktranslate %}</span>
+  {% if page_obj.has_next %}<a href="?sort={{ sort }}&page={{ page_obj.next_page_number }}" aria-label="{% blocktranslate with n=page_obj.next_page_number t=page_obj.paginator.num_pages %}Страница {{ n }} из {{ t }}{% endblocktranslate %}">{% translate "Вперёд" %}</a>{% endif %}
 </div>
 {% endif %}
 {% else %}
-<p class="empty">{% blocktranslate with name=prof.full_name %}Пока нет отзывов. Станьте первым, кто оценит {{ name }}.{% endblocktranslate %}</p>
+<section class="empty empty-state" aria-labelledby="empty-reviews-title">
+  <h3 class="empty-state-title" id="empty-reviews-title">{% translate "Отзывы" %}</h3>
+  <p>{% blocktranslate with name=prof.full_name %}Пока нет отзывов. Станьте первым, кто оценит {{ name }}.{% endblocktranslate %}</p>
+  <a class="btn empty-state-action" href="{% url 'review_new' prof.slug %}">{% translate "Оценить преподавателя" %}</a>
+</section>
 {% endif %}
 {% endblock %}
+{% block page_tools %}{% include "reviews/_back_to_top.html" %}{% endblock %}

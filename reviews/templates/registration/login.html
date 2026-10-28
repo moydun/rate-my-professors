@@ -2,6 +2,13 @@
 {% block title %}{% translate "Вход" %} — ProfLens{% endblock %}
 {% block content %}
 <h1>{% translate "Вход" %}</h1>
-<form method="post" class="form">{% csrf_token %}{{ form.as_p }}<button>{% translate "Войти" %}</button></form>
+<form method="post" class="form">{% csrf_token %}
+  {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+  {{ form.non_field_errors }}
+  {% include "reviews/_form_fields.html" %}
+  <div class="form-actions">
+    <button>{% translate "Войти" %}</button>
+  </div>
+</form>
 <p><a href="{% url 'signup' %}">{% translate "Нет аккаунта? Зарегистрируйтесь" %}</a></p>
 {% endblock %}

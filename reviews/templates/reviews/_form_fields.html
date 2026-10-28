@@ -1,0 +1,13 @@
+{% comment %}
+Shared field markup for all ProfLens forms: label + required marker,
+help text, pill-style choices for radio/checkbox groups, inline errors.
+Expects `form` in the context.
+{% endcomment %}
+{% for field in form %}
+<div class="field{% if field.errors %} has-error{% endif %}">
+  <label for="{{ field.id_for_label }}"><strong>{{ field.label }}</strong>{% if field.field.required %}<span class="req" aria-hidden="true">*</span>{% endif %}</label>
+  {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+  <div{% if field.field.widget.input_type == "radio" or field.field.widget.input_type == "checkbox" %} class="choices"{% endif %}>{{ field }}</div>
+  {{ field.errors }}
+</div>
+{% endfor %}

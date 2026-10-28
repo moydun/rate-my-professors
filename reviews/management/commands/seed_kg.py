@@ -1,13 +1,18 @@
 from django.core.management.base import BaseCommand
-from reviews.seed import SCHOOLS, PROFESSORS, REVIEWS
-from reviews.models import School, Professor, Tag, Review
+
+from reviews.models import Professor, Review, School, Tag
+from reviews.seed import PROFESSORS, REVIEWS, SCHOOLS
 
 
 class Command(BaseCommand):
     help = "Заливает демо-данные из reviews/seed.py в БД (удаляет старые демо-данные)"
 
     def add_arguments(self, parser):
-        parser.add_argument("--clear", action="store_true", help="Очистить существующие школы/преподавателей/отзывы перед заливкой")
+        parser.add_argument(
+            "--clear",
+            action="store_true",
+            help="Очистить существующие школы/преподавателей/отзывы перед заливкой",
+        )
 
     def handle(self, *args, **opts):
         if opts["clear"]:
@@ -41,7 +46,10 @@ class Command(BaseCommand):
             while Professor.objects.filter(slug=slug).exists():
                 slug = f"{base}-{i}"
                 i += 1
-            p = Professor.objects.create(school=school, first_name=first, last_name=last, slug=slug, department=dept, title=title, status="approved")
+            p = Professor.objects.create(
+                school=school, first_name=first, last_name=last, slug=slug,
+                department=dept, title=title, status="approved",
+            )
             profs.append(p)
 
         for pi, course, term, overall, diff, wta, grade, comment, tags in REVIEWS:
@@ -53,4 +61,6 @@ class Command(BaseCommand):
                 tag, _ = Tag.objects.get_or_create(name=t)
                 r.tags.add(tag)
 
-        self.stdout.write(self.style.SUCCESS(f"Готово: {len(schools)} вузов, {len(profs)} преподавателей, {len(REVIEWS)} отзывов."))
+        self.stdout.write(self.style.SUCCESS(
+            f"Готово: {len(schools)} вузов, {len(profs)} преподавателей, {len(REVIEWS)} отзывов."
+        ))

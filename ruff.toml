@@ -1,0 +1,10 @@
+target-version = "py312"
+line-length = 120
+
+[lint]
+select = ["E", "F", "I", "W"]
+ignore = ["E203"]
+
+[lint.per-file-ignores]
+# Django auto-generated migrations: long lines and import layout are not our concern.
+"**/migrations/*.py" = ["E501"]

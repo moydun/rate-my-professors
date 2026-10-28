@@ -1,21 +1,17 @@
 {% extends "reviews/base.html" %}{% load i18n %}
-{% block title %}{% blocktranslate with name=prof.full_name %}Оценить {{ name }}{% endblocktranslate %} — ProfLens{% endblock %}
+{% block title %}{% if editing %}{% translate "Изменить отзыв" %}{% else %}{% blocktranslate with name=prof.full_name %}Оценить {{ name }}{% endblocktranslate %}{% endif %} — ProfLens{% endblock %}
 {% block content %}
-<h1>{% blocktranslate with name=prof.full_name %}Оценить {{ name }}{% endblocktranslate %}</h1>
-<p class="muted">{% translate "Отзыв появится после проверки модератором." %} <a href="{{ url }}">{% translate "Правила" %}</a>.</p>
+<h1>{% if editing %}{% translate "Изменить отзыв" %}{% else %}{% blocktranslate with name=prof.full_name %}Оценить {{ name }}{% endblocktranslate %}{% endif %}</h1>
+  <p class="muted">{% translate "Отзыв появится после проверки модератором." %} <a href="{{ url }}">{% translate "Правила" %}</a>.</p>
 {% if not user.is_authenticated %}
 <p class="notice">{% translate "Чтобы оставить отзыв," %} <a href="{{ login_url }}">{% translate "войдите" %}</a> {% translate "или" %} <a href="{{ signup_url }}">{% translate "зарегистрируйтесь" %}</a>.</p>
 {% endif %}
 <form method="post" class="form">{% csrf_token %}
-  {% for field in form %}
-  <div class="field">
-    <label for="{{ field.id_for_label }}"><strong>{{ field.label }}</strong></label>
-    {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
-    <div{% if field.field.widget.input_type == "radio" or field.field.widget.input_type == "checkbox" %} class="choices"{% endif %}>{{ field }}</div>
-    {{ field.errors }}
+  {{ form.non_field_errors }}
+  {% include "reviews/_form_fields.html" %}
+  <div class="form-actions">
+     <button>{% if editing %}{% translate "Сохранить изменения" %}{% else %}{% translate "Отправить на модерацию" %}{% endif %}</button>
+    <a class="cancel" href="{% url 'professor' prof.slug %}">{% translate "Отмена" %}</a>
   </div>
-  {% endfor %}
-  <button>{% translate "Отправить на модерацию" %}</button>
-  <a href="{% url 'professor' prof.slug %}">{% translate "Отмена" %}</a>
 </form>
 {% endblock %}

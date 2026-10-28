@@ -1,0 +1,6 @@
+{% load static i18n %}
+<button class="back-to-top" type="button" data-back-to-top aria-label="{% translate 'Наверх' %}" title="{% translate 'Наверх' %}" hidden>
+  <span aria-hidden="true">↑</span>
+  <span>{% translate "Наверх" %}</span>
+</button>
+<script src="{% static 'reviews/back-to-top.js' %}" defer></script>

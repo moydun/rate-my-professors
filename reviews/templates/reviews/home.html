@@ -1,4 +1,4 @@
-{% extends "reviews/base.html" %}{% load i18n %}
+{% extends "reviews/base.html" %}{% load i18n l10n %}
 {% block content %}
 <h1>{% translate "Узнайте, какие занятия на самом деле — до записи на курс." %}</h1>
 <form class="search" method="get">
@@ -15,27 +15,28 @@
     <option value="">{% translate "Все кафедры" %}</option>
     {% for d in departments %}<option value="{{ d }}"{% if d == department %} selected{% endif %}>{{ d }}</option>{% endfor %}
   </select>
-  <button>{% translate "Найти" %}</button>
+  <select name="sort" aria-label="{% translate 'Сортировка' %}">
+    <option value="rating"{% if sort == "rating" %} selected{% endif %}>{% translate "По рейтингу" %}</option>
+    <option value="reviews"{% if sort == "reviews" %} selected{% endif %}>{% translate "По числу отзывов" %}</option>
+  </select>
+  <button type="submit" aria-label="{% translate 'Найти' %}">{% translate "Найти" %}</button>
 </form>
-<ol class="rows">
+<ol class="cards">
   {% for r in results %}
-  <li>
-    <a class="row" href="{% url 'professor' r.prof.slug %}">
-      <span class="tile {{ r.stats.tone }}">{% if r.stats.count %}{{ r.stats.overall|floatformat:1 }}{% else %}-{% endif %}</span>
-      <span class="who"><strong>{{ r.prof.full_name }}</strong><span>{{ r.prof.department }} — {{ r.school.name }}</span></span>
-      <span class="meta">{{ r.stats.count }} {% translate "отзывов" %}</span>
-      <span class="meta">{% translate "Сложность" %} {% if r.stats.count %}{{ r.stats.difficulty|floatformat:1 }}{% else %}-{% endif %}</span>
-    </a>
-  </li>
+  {% include "reviews/_professor_card.html" with r=r show_school=True show_difficulty=True %}
   {% empty %}
-  <li class="empty">{% translate "Ничего не нашлось. Попробуйте короче запрос или другой вуз/город." %}</li>
+  <li class="empty empty-state" role="status">
+    <strong class="empty-state-title">{% translate "Ничего не нашлось" %}</strong>
+    <p>{% translate "Попробуйте сократить запрос или изменить фильтры." %}</p>
+    <a class="empty-state-action" href="{% url 'home' %}">{% translate "Сбросить фильтры" %}</a>
+  </li>
   {% endfor %}
 </ol>
 {% if page_obj %}
 <div class="pagination">
-  {% if page_obj.has_previous %}<a href="?q={{ q }}&school={{ school }}&city={{ city }}&department={{ department }}&page={{ page_obj.previous_page_number }}">{% translate "Назад" %}</a>{% endif %}
+  {% if page_obj.has_previous %}<a href="?q={{ q|urlencode }}&school={{ school|urlencode }}&city={{ city|urlencode }}&department={{ department|urlencode }}&sort={{ sort|urlencode }}&page={{ page_obj.previous_page_number }}">{% translate "Назад" %}</a>{% endif %}
   <span>{% blocktranslate with n=page_obj.number t=page_obj.paginator.num_pages %}Страница {{ n }} из {{ t }}{% endblocktranslate %}</span>
-  {% if page_obj.has_next %}<a href="?q={{ q }}&school={{ school }}&city={{ city }}&department={{ department }}&page={{ page_obj.next_page_number }}">{% translate "Вперёд" %}</a>{% endif %}
+  {% if page_obj.has_next %}<a href="?q={{ q|urlencode }}&school={{ school|urlencode }}&city={{ city|urlencode }}&department={{ department|urlencode }}&sort={{ sort|urlencode }}&page={{ page_obj.next_page_number }}">{% translate "Вперёд" %}</a>{% endif %}
 </div>
 {% endif %}
 {% endblock %}

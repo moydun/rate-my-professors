@@ -1,21 +1,38 @@
-{% extends "reviews/base.html" %}{% load i18n %}
+{% extends "reviews/base.html" %}{% load i18n l10n %}
 {% block title %}{{ school.name }} — ProfLens{% endblock %}
+{% block description %}{% blocktranslate with name=school.name city=school.city %}Преподаватели и отзывы студентов вуза {{ name }} ({{ city }}): рейтинги, кафедры и советы.{% endblocktranslate %}{% endblock %}
+{% block og_title %}{{ school.name }} — ProfLens{% endblock %}
+{% block og_description %}{% blocktranslate with name=school.name city=school.city %}Преподаватели и отзывы студентов вуза {{ name }} ({{ city }}): рейтинги, кафедры и советы.{% endblocktranslate %}{% endblock %}
 {% block content %}
+<nav class="breadcrumbs" aria-label="{% translate 'Хлебные крошки' %}">
+  <ol>
+    <li><a href="{% url 'home' %}">{% translate "Главная" %}</a></li>
+    <li aria-current="page">{{ school.name }}</li>
+  </ol>
+</nav>
 <h1>{{ school.name }}</h1>
 <p class="sub">{{ school.city }}</p>
 {% if stats.prof_count %}
 <dl class="facts">
-  <div><dt>{% translate "Преподавателей" %}</dt><dd>{{ stats.prof_count }}</dd></div>
-  <div><dt>{% translate "Отзывов" %}</dt><dd>{{ stats.review_count }}</dd></div>
-  {% if stats.avg_overall %}<div><dt>{% translate "Средний рейтинг" %}</dt><dd>{{ stats.avg_overall }}</dd></div>{% endif %}
+  <div><dt>{% translate "Преподавателей" %}</dt><dd>{{ stats.prof_count|localize }}</dd></div>
+  <div><dt>{% translate "Отзывов" %}</dt><dd>{{ stats.review_count|localize }}</dd></div>
+  {% if stats.avg_overall %}<div><dt>{% translate "Средний рейтинг" %}</dt><dd>{{ stats.avg_overall|floatformat:1|localize }}</dd></div>{% endif %}
 </dl>
 {% endif %}
 <h2>{% translate "Кафедры" %}</h2>
 {% if departments %}<p class="tags">{{ departments|join:", " }}</p>{% else %}<p class="empty">{% translate "Пока нет кафедр." %}</p>{% endif %}
 <h2>{% translate "Преподаватели" %}</h2>
-<ol class="rows">
+<ol class="cards">
   {% for r in results %}
-  <li><a class="row" href="{% url 'professor' r.prof.slug %}"><span class="tile {{ r.stats.tone }}">{% if r.stats.count %}{{ r.stats.overall|floatformat:1 }}{% else %}-{% endif %}</span><span class="who"><strong>{{ r.prof.full_name }}</strong><span>{{ r.prof.department }}</span></span><span class="meta">{{ r.stats.count }} {% translate "отзывов" %}</span></a></li>
+  {% include "reviews/_professor_card.html" with r=r show_school=False show_difficulty=False %}
   {% empty %}<li class="empty">{% translate "Пока нет преподавателей." %}</li>{% endfor %}
 </ol>
+{% if page_obj %}
+<div class="pagination">
+  {% if page_obj.has_previous %}<a href="?page={{ page_obj.previous_page_number }}">{% translate "Назад" %}</a>{% endif %}
+  <span>{% blocktranslate with n=page_obj.number t=page_obj.paginator.num_pages %}Страница {{ n }} из {{ t }}{% endblocktranslate %}</span>
+  {% if page_obj.has_next %}<a href="?page={{ page_obj.next_page_number }}">{% translate "Вперёд" %}</a>{% endif %}
+</div>
+{% endif %}
 {% endblock %}
+{% block page_tools %}{% include "reviews/_back_to_top.html" %}{% endblock %}

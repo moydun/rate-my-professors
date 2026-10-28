@@ -1,0 +1,10 @@
+{% extends "reviews/base.html" %}{% load i18n %}
+{% block title %}{% translate "Удалить отзыв" %} — ProfLens{% endblock %}
+{% block content %}
+<h1>{% translate "Удалить отзыв" %}</h1>
+<p>{% translate "Вы уверены, что хотите удалить этот отзыв?" %}</p>
+<form method="post">{% csrf_token %}
+  <button type="submit">{% translate "Удалить" %}</button>
+  <a href="{% url 'profile' %}">{% translate "Отмена" %}</a>
+</form>
+{% endblock %}
